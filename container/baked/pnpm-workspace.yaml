@@ -1,0 +1,4 @@
+# Generic placeholder workspace for the baked cold-start sample.
+# Intentionally minimal — see container/baked/package.json for why this
+# is a generic manifest rather than a mirror of any specific target repo.
+packages: []

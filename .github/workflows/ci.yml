@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs on the same ref when a new push lands.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: typecheck + vitest + container + bats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # Version comes from package.json#packageManager — no `version:` here.
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      - run: pnpm test:container
+
+      - run: pnpm exec bats test/entrypoint.bats
+
+  # Gate: deploy + gateway run only when the Cloudflare secrets exist. A
+  # job-level `if:` can't read `secrets` directly, so we surface their presence
+  # as an output here; the downstream jobs then SKIP cleanly (not fail red)
+  # when the secrets are absent — e.g. on the public repo, which has none.
+  # Fork and set CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID to enable deploys.
+  gate:
+    name: deploy gate
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$CF_API_TOKEN" ] && [ -n "$CF_ACCOUNT_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cloudflare secrets not configured — skipping deploy + gateway jobs."
+          fi
+
+  deploy:
+    name: wrangler deploy
+    needs: [test, gate]
+    # Deploy only when the gate found the Cloudflare secrets. No secrets
+    # (e.g. the public repo) → this job is SKIPPED, not failed.
+    if: needs.gate.outputs.configured == 'true'
+    runs-on: ubuntu-latest
+    # Container build needs Docker; ubuntu-latest has it pre-installed.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # Version comes from package.json#packageManager — no `version:` here.
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: wrangler deploy
+        run: pnpm wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # Provisioning the (account-level) AI Gateway is intentionally a SEPARATE job
+  # that `deploy` does NOT depend on — a gateway/token failure must never block
+  # shipping Worker code. A failure here is visible as a red job, but the deploy
+  # still runs; the gateway also auto-creates on first request (ADR-001).
+  provision-gateway:
+    name: provision AI Gateway
+    needs: [test, gate]
+    if: needs.gate.outputs.configured == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: provision AI Gateway
+        run: ./scripts/provision-gateway.sh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "metriq": {
+      "type": "http",
+      "url": "${METRIQ_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${METRIQ_API_KEY}"
+      }
+    }
+  }
+}

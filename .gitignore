@@ -1,0 +1,18 @@
+node_modules
+.wrangler
+.dev.vars
+.dev.vars.*
+
+# .env is a committed template (variable names only).
+# Real values go in .env.local (or environment-specific *.local files).
+.env.local
+.env.*.local
+
+dist
+coverage
+*.log
+.DS_Store
+
+# Developer-local Claude Code permissions
+.claude/
+.nwave/

@@ -1,0 +1,11 @@
+pre-push:
+  parallel: true
+  commands:
+    typecheck:
+      run: pnpm typecheck
+    test:
+      run: pnpm test
+    container:
+      run: pnpm test:container
+    bats:
+      run: pnpm exec bats test/entrypoint.bats

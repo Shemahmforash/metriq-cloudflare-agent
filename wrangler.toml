@@ -1,0 +1,56 @@
+name = "metriq-cloudflare-agent"
+main = "src/worker.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+[[durable_objects.bindings]]
+name = "AGENT_LOOP"
+class_name = "MetriqAgentLoop"
+
+[[durable_objects.bindings]]
+name = "AGENT_CONTAINER"
+class_name = "AgentContainer"
+
+[[containers]]
+class_name = "AgentContainer"
+image = "./container/Dockerfile"
+max_instances = 5
+# Default `dev` instance is 256 MiB — too small for `pnpm install` + any
+# pre-push checks against a non-trivial target-repo dependency tree (observed
+# exit 137 OOM-kill mid-`pnpm install`). `standard-1` is 4 GiB.
+instance_type = "standard-1"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MetriqAgentLoop"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["AgentContainer"]
+
+# Secrets (set via `wrangler secret put`, never committed):
+#   METRIQ_API_KEY  — Bearer token from Metriq Settings → Agents
+#   METRIQ_MCP_URL  — e.g. https://metriq.app/api/v1/mcp
+#   CONTROL_TOKEN   — bearer token required on /wake /stop /pause /resume /debug
+#                     (the public Worker control + debug routes). /health stays
+#                     open. Fail-closed: if unset, those routes reject everyone.
+#   AGENT_PAUSED    — operator kill-switch. Set to "true" (or "1"/"yes") to make
+#                     pollForWork short-circuit BEFORE the MCP call and re-arm a
+#                     long (~60s) alarm. Use as a one-secret incident pause when
+#                     Metriq's MCP endpoint is degraded:
+#                       `wrangler secret put AGENT_PAUSED` → enter "true"
+#                       `wrangler secret put AGENT_PAUSED` → enter "false" (or `wrangler secret delete AGENT_PAUSED`)
+#                     The unpause propagates within ~1 minute (the next paused
+#                     re-arm wakes, sees the new value, and resumes polling).
+#                     Distinct from the in-DO POST /pause endpoint (single-DO,
+#                     ad-hoc); AGENT_PAUSED is fleet-wide + deploy-driven.
+#
+# Deploy-time vars (set via `wrangler secret put`, or a [vars] block):
+#   TARGET_REPO         — REQUIRED. "owner/name" the agent clones + opens PRs
+#                         against. No default — the container fails fast if unset.
+#   TARGET_BASE_BRANCH  — the PR base branch. Default: main.
+#                         The GITHUB_PAT must have access to TARGET_REPO.
