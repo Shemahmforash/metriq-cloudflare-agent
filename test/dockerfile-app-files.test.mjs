@@ -49,13 +49,12 @@ test("every local import in container/server.js is COPYed into the image's /app"
   );
 });
 
-// open-source-llm Phase 2 / Slice D (ADR-005 Part C, review D2): the OSS path
-// runs `opencode run` in the container. The harness MUST be installed in the
-// image — the bats suite only passes because it PATH-stubs `opencode`, which
-// would never catch a missing install in the real image (the OSS dispatch
-// would die with "opencode: command not found"). Pin it EXACTLY to the
-// SPIKE-pinned version so the bake-off measures the version it was validated
-// against (ADR-005 reproducibility).
+// ADR-005 Part C: the OSS path runs `opencode run` in the container. The
+// harness MUST be installed in the image — the bats suite only passes because
+// it PATH-stubs `opencode`, which would never catch a missing install in the
+// real image (the OSS dispatch would die with "opencode: command not found").
+// Pin it EXACTLY to the validated version so the bake-off measures the version
+// it was validated against (ADR-005 reproducibility).
 test("Dockerfile pins the OpenCode harness to opencode-ai@1.15.11", () => {
   assert.match(
     dockerfile,

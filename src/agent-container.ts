@@ -4,20 +4,20 @@ interface ContainerEnv {
   GITHUB_PAT: string;
   GITHUB_USER: string;
   ANTHROPIC_API_KEY: string;
-  // open-source-llm Slice A / ADR-001: per-DO-instance CONSTANTS.
+  // ADR-001: per-DO-instance CONSTANTS.
   // ANTHROPIC_BASE_URL points Claude Code at the AI Gateway Anthropic endpoint;
   // AI_GATEWAY_TOKEN (optional) becomes cf-aig-authorization. These belong in
-  // ContainerEnv (constant lifetime) — NOT the per-dispatch /start body (UC-1).
-  // The Claude path uses these (CF gateway). The OSS path does NOT (Decision B).
+  // ContainerEnv (constant lifetime) — NOT the per-dispatch /start body.
+  // The Claude path uses these (CF gateway). The OSS path does NOT.
   ANTHROPIC_BASE_URL?: string;
   AI_GATEWAY_TOKEN?: string;
-  // open-source-llm Phase 2 / Slice D / ADR-006: per-DO-instance CONSTANTS for
-  // the OSS path (provider-agnostic OpenAI-compatible endpoint, LiteLLM by
-  // default). OpenCode dials OSS_MODEL_BASE_URL with OSS_MODEL_API_KEY (written
-  // into the dispatch-time opencode.json, ADR-005). OSS_MODEL_API_KEY is
-  // forwarded ONLY-WHEN-SET (like AI_GATEWAY_TOKEN) so the OpenCode branch fails
-  // fast → escalates when the key is absent (ADR-006/008). The OSS path carries
-  // NO cf-aig headers and never the GITHUB_PAT (Decision B / ADR-006 §6).
+  // ADR-006: per-DO-instance CONSTANTS for the OSS path (provider-agnostic
+  // OpenAI-compatible endpoint, LiteLLM by default). OpenCode dials
+  // OSS_MODEL_BASE_URL with OSS_MODEL_API_KEY (written into the dispatch-time
+  // opencode.json, ADR-005). OSS_MODEL_API_KEY is forwarded ONLY-WHEN-SET (like
+  // AI_GATEWAY_TOKEN) so the OpenCode branch fails fast → escalates when the key
+  // is absent (ADR-006/008). The OSS path carries NO cf-aig headers and never
+  // the GITHUB_PAT (ADR-006 §6).
   OSS_MODEL_BASE_URL?: string;
   OSS_MODEL_API_KEY?: string;
   // Deploy-time constants: which repo the agent clones + opens PRs against.
@@ -29,7 +29,7 @@ interface ContainerEnv {
 }
 
 /**
- * Pure builder for the container constant-env forwarding map (Slice A, ADR-001).
+ * Pure builder for the container constant-env forwarding map (ADR-001).
  *
  * Worker secrets are NOT inherited by the container automatically — they must be
  * explicitly forwarded to AgentContainer.envVars. This forwards:
@@ -42,7 +42,7 @@ interface ContainerEnv {
  *    `cf-aig-authorization: Bearer ` header.
  *
  * Per-dispatch values (model, cost_tags) do NOT belong here — they ride the
- * POST /start body (UC-1).
+ * POST /start body.
  */
 export function buildContainerEnvVars(
   env: ContainerEnv,
@@ -52,7 +52,7 @@ export function buildContainerEnvVars(
     GITHUB_USER: env.GITHUB_USER ?? "",
     ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY ?? "",
     ANTHROPIC_BASE_URL: env.ANTHROPIC_BASE_URL ?? "",
-    // open-source-llm Phase 2 / ADR-006: the OSS endpoint base URL is a constant
+    // ADR-006: the OSS endpoint base URL is a constant
     // (empty default, like ANTHROPIC_BASE_URL). The OpenCode branch reads it to
     // build opencode.json's provider.options.baseURL.
     OSS_MODEL_BASE_URL: env.OSS_MODEL_BASE_URL ?? "",
@@ -67,7 +67,7 @@ export function buildContainerEnvVars(
   if (env.AI_GATEWAY_TOKEN) {
     vars.AI_GATEWAY_TOKEN = env.AI_GATEWAY_TOKEN;
   }
-  // open-source-llm Phase 2 / ADR-006: forward OSS_MODEL_API_KEY ONLY-WHEN-SET.
+  // ADR-006: forward OSS_MODEL_API_KEY ONLY-WHEN-SET.
   // Key-absent is the fail-fast signal the OpenCode branch uses (no key ⇒ exit
   // non-zero ⇒ escalate). Never present-but-empty.
   if (env.OSS_MODEL_API_KEY) {

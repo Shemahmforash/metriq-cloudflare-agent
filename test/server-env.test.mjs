@@ -5,7 +5,7 @@
 // so we can capture the env handed to the child WITHOUT booting a real
 // container or the HTTP listener.
 //
-// open-source-llm Slice A (01-04): the per-dispatch `model` + `cost_tags` ride
+// The per-dispatch `model` + `cost_tags` ride
 // the POST /start body; server.js must forward them to the entrypoint child as
 // AGENT_MODEL and CF_AIG_METADATA (a JSON string) so entrypoint.sh can pass
 // `--model` and assemble cf-aig-metadata. Constants (ANTHROPIC_BASE_URL,
@@ -76,9 +76,9 @@ test("CF_AIG_METADATA is empty (not undefined) when ctx.cost_tags is absent", ()
   assert.equal(env.CF_AIG_METADATA, "");
 });
 
-// ---- open-source-llm Phase 2 / Slice D (ADR-005): forward the resolved
-// `harness` from the /start body to the entrypoint child as AGENT_HARNESS, so
-// entrypoint.sh branches claude vs opencode. RED until server.js forwards it.
+// ---- ADR-005: forward the resolved `harness` from the /start body to the
+// entrypoint child as AGENT_HARNESS, so entrypoint.sh branches claude vs
+// opencode.
 
 test("forwards ctx.harness to the child as AGENT_HARNESS", () => {
   const env = captureEnv({

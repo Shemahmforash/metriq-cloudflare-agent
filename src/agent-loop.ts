@@ -101,24 +101,24 @@ interface CurrentDispatch {
   workItemId: string;
   startedAt: number;
   title: string;
-  // open-source-llm Phase 2 / Slice D+E (ADR-005/008): which harness ran this
-  // dispatch. monitorDispatch records an escalation intent only when a FAILED
-  // dispatch's harness was "opencode" (ADR-008 §3). Optional for back-compat
-  // with any in-flight Phase-1 currentDispatch records (treated as "claude").
+  // ADR-005/008: which harness ran this dispatch. monitorDispatch records an
+  // escalation intent only when a FAILED dispatch's harness was "opencode"
+  // (ADR-008 §3). Optional for back-compat with any in-flight currentDispatch
+  // records predating harness tracking (treated as "claude").
   harness?: "claude" | "opencode";
   // The resolved OSS model id this dispatch ran (ADR-008): carried so a recorded
-  // escalation intent can store the FAILED OSS model for KPI-6 cost analytics
-  // (ADR-007). Optional for back-compat with in-flight Phase-1 records.
+  // escalation intent can store the FAILED OSS model for cost analytics
+  // (ADR-007). Optional for back-compat with older in-flight records.
   model?: string;
   // The DO-minted cost-attribution tags for this dispatch (ADR-004/007). Carried
   // on the record so recordEscalationIntent can recover the authoritative
   // resolved model id (costTags.model) if `model` above is somehow absent —
-  // KPI-6 joins on a NON-empty failedModel (review D4). Optional for back-compat.
+  // cost roll-up joins on a NON-empty failedModel. Optional for back-compat.
   costTags?: CostAttributionTags;
 }
 
 /**
- * open-source-llm Phase 2 / Slice E (ADR-008): the work_item_id-keyed escalation
+ * ADR-008: the work_item_id-keyed escalation
  * intent persisted in DO storage when an OSS dispatch fails. It survives the gap
  * to the ticket's NEXT, separate delivery (currentDispatch is deleted on
  * failure), where startDispatch consumes it to coerce the model to Claude.
@@ -189,8 +189,8 @@ export class MetriqAgentLoop extends DurableObject<Env> {
   /** Test-only override for the daily-dispatch cap. */
   testDailyCap?: number;
   /**
-   * Test-only override for the operator-configured fleet default model
-   * (open-source-llm Slice B). Production sets the default via the
+   * Test-only override for the operator-configured fleet default model.
+   * Production sets the default via the
    * AGENT_MODEL_DEFAULT secret (AgentConfig.agentModelDefault), never this
    * field; tests use it to exercise the AGENT_MODEL_DEFAULT precedence branch.
    */
@@ -538,7 +538,7 @@ export class MetriqAgentLoop extends DurableObject<Env> {
     // its outcome. This decoupling keeps every alarm invocation well short of
     // the 15-min DO wall-clock ceiling.
     // Resolve the per-dispatch model + provenance (ADR-002). The resolved value
-    // rides the POST /start BODY — the per-dispatch command channel (UC-1) — not
+    // rides the POST /start BODY — the per-dispatch command channel — not
     // ContainerEnv. ticketModel is the per-ticket override (precedence level 1);
     // resolveModel falls through to the operator/hardcoded default when it's
     // absent/blank/unknown (ADR-003 fail-safe; never throws).
@@ -562,11 +562,11 @@ export class MetriqAgentLoop extends DurableObject<Env> {
       );
     }
 
-    // Escalate-once consume (Phase 2 / Slice E / ADR-008 §3-4). If a prior OSS
+    // Escalate-once consume (ADR-008 §3-4). If a prior OSS
     // dispatch of THIS work item failed, an escalation intent was recorded
     // (monitorDispatch). On this (later, separate) delivery, coerce the resolved
     // model to the Claude floor — so resolveHarness derives "claude" — set
-    // fallbackOf for the cost back-link (ADR-007/KPI-6), and CONSUME (delete) the
+    // fallbackOf for the cost back-link (ADR-007), and CONSUME (delete) the
     // intent so a Claude-rescue failure does NOT re-escalate (escalate-once, no
     // loop). When no intent exists this is a no-op and the resolved value rides
     // unchanged — the no-strand dispatch path is untouched.
@@ -580,15 +580,15 @@ export class MetriqAgentLoop extends DurableObject<Env> {
       fallbackOf = esc.failedDispatchId;
     }
 
-    // Harness selection (Phase 2 / Slice D / ADR-005). Derive the harness from
+    // Harness selection (ADR-005). Derive the harness from
     // the resolved model id (anthropic/* → claude, else opencode). Carried in
     // the /start body so entrypoint.sh branches on it. resolveHarness is pure +
     // total (never throws) — mirrors resolveModel's fail-safe discipline.
     const harness = resolveHarness(resolved.model);
 
-    // Mint the per-dispatch cost-attribution tags (ADR-004 + ADR-007, KPI-1/6).
+    // Mint the per-dispatch cost-attribution tags (ADR-004 + ADR-007).
     // Every value is DO-minted / allow-list-validated — no external free-text
-    // (injection guard). Phase 2 adds the harness + fallback_of dimensions
+    // (injection guard). The harness + fallback_of dimensions are included
     // (ADR-007).
     const shortId = dispatchId.slice(0, SHORT_ID_CHARS);
     const costTags = buildCostAttributionTags({
@@ -713,7 +713,7 @@ export class MetriqAgentLoop extends DurableObject<Env> {
   }
 
   /**
-   * Production seam (Phase 2 / Slice E / ADR-008 §3): on a terminal OSS-dispatch
+   * Production seam (ADR-008 §3): on a terminal OSS-dispatch
    * failure, record an escalation intent so the ticket's NEXT delivery runs
    * Claude. Purely additive bookkeeping beside the existing
    * `delete("currentDispatch")` — it NEVER short-circuits the no-strand path.
@@ -742,7 +742,7 @@ export class MetriqAgentLoop extends DurableObject<Env> {
     if (existing) return;
     const intent: EscalationIntent = {
       failedDispatchId: current.dispatchId,
-      // Review D4: KPI-6's bake-off joins on failedModel, so it must be the REAL
+      // The cost-bake-off roll-up joins on failedModel, so it must be the REAL
       // OSS model id — never "". Derive from the authoritative source: the
       // dispatch's resolved model, falling back to the model carried in the
       // DO-minted cost tags (set at startDispatch for every OSS dispatch). The
@@ -757,7 +757,7 @@ export class MetriqAgentLoop extends DurableObject<Env> {
   }
 
   /**
-   * Resolve the failed OSS model id for an escalation intent (review D4).
+   * Resolve the failed OSS model id for an escalation intent.
    * Authoritative order: the dispatch's resolved `model`, then the model carried
    * in the DO-minted cost tags. Both are set at startDispatch for OSS dispatches;
    * the `""` floor is unreachable for an opencode dispatch (harness is derived
@@ -798,8 +798,8 @@ export class MetriqAgentLoop extends DurableObject<Env> {
     if (!parsedUrl) {
       // entrypoint exited 0 but printed no URL — shouldn't happen (set -e +
       // explicit PR echo), but treat as a failure so the sweeper reclaims.
-      // For OpenCode this is the "empty PR / no edits" failure (US-04/05 Domain
-      // Example 3) — an OSS failure that must escalate to Claude (ADR-008 §1).
+      // For OpenCode this is the "empty PR / no edits" failure — an OSS failure
+      // that must escalate to Claude (ADR-008 §1).
       const bodyExcerpt = stdoutTail.slice(0, CONTAINER_LOG_BYTES);
       console.error(
         `dispatch ${dispatchId} container done but no URL in output; sweeper will reclaim; body=${bodyExcerpt}`,

@@ -496,7 +496,7 @@ describe("McpClient.postAgentComment", () => {
   });
 });
 
-describe("McpClient transport-layer back-off (slice 1 carry-over)", () => {
+describe("McpClient transport-layer back-off", () => {
   it("retries on network error (fetch throws) using the configured schedule", async () => {
     const attempts: number[] = [];
     const fetchMock = vi.fn().mockImplementation(() => {
@@ -532,7 +532,7 @@ describe("McpClient transport-layer back-off (slice 1 carry-over)", () => {
     expect(attempts).toHaveLength(3); // 2 network errors + 1 success
   });
 
-  it("does NOT retry on HTTP non-2xx (slice 2 retry layer handles those)", async () => {
+  it("does NOT retry on HTTP non-2xx (the application-layer retry handles those)", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response("server error", {
         status: 503,

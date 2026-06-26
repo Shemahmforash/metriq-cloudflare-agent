@@ -310,13 +310,13 @@ describe("MetriqAgentLoop dispatch happy path (container)", () => {
         payload: {
           dispatch_id: "d-1",
           work_item_id: "wi-1",
-          payload: { title: "Hello slice 3", description: "demo" },
+          payload: { title: "Hello world", description: "demo" },
         },
       },
       { name: "claim_assigned_task", payload: { ok: true, work_item_id: "wi-1" } },
       {
         name: "get_item",
-        payload: { id: "wi-1", title: "Hello slice 3", currentState: "ready" },
+        payload: { id: "wi-1", title: "Hello world", currentState: "ready" },
       },
       { name: "move_item", payload: { error: null } },
       {
@@ -376,7 +376,7 @@ describe("MetriqAgentLoop dispatch happy path (container)", () => {
     expect(ctxBody).toMatchObject({
       work_item_id: "wi-1",
       dispatch_id: "d-1",
-      title: "Hello slice 3",
+      title: "Hello world",
       short_id: "d-1".slice(0, 8),
     });
 
@@ -404,7 +404,7 @@ describe("MetriqAgentLoop dispatch happy path (container)", () => {
       itemId: "wi-1",
       url: "https://example.com/fake-pr",
       kind: "pr",
-      title: "Hello slice 3",
+      title: "Hello world",
     });
     const finalMoveArgs = JSON.parse(calls[6]!.body).params.arguments;
     expect(finalMoveArgs).toEqual({

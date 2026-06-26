@@ -23,13 +23,13 @@ export function spawnEntrypoint(ctx, spawnFn = spawn) {
       SHORT_ID: ctx.short_id ?? "",
       TITLE: ctx.title ?? "",
       DESCRIPTION: ctx.description ?? "",
-      // Per-dispatch values carried from the /start body (open-source-llm Slice
-      // A, UC-1): the resolved model (claude --model) and the cost-attribution
-      // tags (entrypoint exports them as cf-aig-metadata). Serialize cost_tags
-      // to a JSON string for transport through the process env.
+      // Per-dispatch values carried from the /start body: the resolved model
+      // (claude --model) and the cost-attribution tags (entrypoint exports them
+      // as cf-aig-metadata). Serialize cost_tags to a JSON string for transport
+      // through the process env.
       AGENT_MODEL: ctx.model ?? "",
       CF_AIG_METADATA: ctx.cost_tags ? JSON.stringify(ctx.cost_tags) : "",
-      // open-source-llm Phase 2 / Slice D (ADR-005): the resolved harness rides
+      // ADR-005: the resolved harness rides
       // the /start body too. entrypoint.sh branches claude (unset/empty) vs
       // opencode on it. Empty string (not undefined) when absent so the shell
       // sees a defined-but-empty var and falls through to the claude path.

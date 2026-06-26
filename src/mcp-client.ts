@@ -226,7 +226,7 @@ export class McpClient {
 
   /**
    * Retry on TRANSPORT errors only — fetch throwing (DNS, refused, TLS, reset).
-   * HTTP status codes (5xx, 401, etc.) flow through unchanged so the slice-2
+   * HTTP status codes (5xx, 401, etc.) flow through unchanged so the
    * application-layer retry (or the caller) decides what to do with them.
    */
   private async fetchWithBackoff(init: RequestInit): Promise<Response> {

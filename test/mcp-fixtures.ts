@@ -17,7 +17,7 @@ export interface PreContainerOpts {
   sessionId?: string;
   /**
    * Optional ticket `model` field on the wait_for_assignment payload
-   * (open-source-llm Slice C / ADR-003). Omit ⇒ the payload has no `model`
+   * (ADR-003). Omit ⇒ the payload has no `model`
    * field (the cross-system absent case). Pass "" to exercise the blank case.
    */
   ticketModel?: string;

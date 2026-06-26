@@ -1,14 +1,14 @@
 /**
- * Shared Durable-Object acceptance-test harness for the open-source-llm feature.
+ * Shared Durable-Object acceptance-test harness for the model-selection feature.
  *
- * Extracted (Phase 2) from test/model-selection.acceptance.test.ts so the
- * Phase-1 and Phase-2 acceptance suites share ONE copy of the alarm-clearing /
+ * Extracted from test/model-selection.acceptance.test.ts so the model-selection
+ * and harness-selection acceptance suites share ONE copy of the alarm-clearing /
  * isolated-storage-safe driving logic — not two divergent copies.
  *
  * Why this exists (the CI isolation flake it fixes):
  *
  *   These scenarios drive the REAL DO, which persists storage + alarms in the
- *   shared workers-pool isolate. A walking skeleton / escalation scenario is RED
+ *   shared workers-pool isolate. An end-to-end / escalation scenario is RED
  *   by design, so any cleanup placed AFTER an assertion never runs once the
  *   assertion throws — leaving `currentDispatch` + a scheduled (re-armed,
  *   real-time) alarm behind, which corrupts the next test file's stacked isolated
@@ -204,7 +204,7 @@ export async function drive(
 
 /**
  * Read a DO storage key from inside the instance (for asserting durable state
- * such as the escalation intent, Slice E / ADR-008). Registers the stub for
+ * such as the escalation intent, ADR-008). Registers the stub for
  * teardown so the read alone never leaks state.
  */
 export async function readStorage<T>(
@@ -219,7 +219,7 @@ export async function readStorage<T>(
 
 /**
  * Seed a DO storage key from inside the instance (for arranging durable state
- * such as a pre-existing escalation intent, Slice E / ADR-008). Registers the
+ * such as a pre-existing escalation intent, ADR-008). Registers the
  * stub for teardown.
  */
 export async function seedStorage(

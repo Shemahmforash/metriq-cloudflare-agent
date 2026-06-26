@@ -78,11 +78,11 @@ ${DESCRIPTION}
 
 Make the changes in this repository. Run \`pnpm test\` to verify nothing breaks. You may commit your changes; if you don't, the agent will commit them for you."
 
-# open-source-llm Phase 2 / Slice D (ADR-005/006, UC-3): pick the harness.
+# ADR-005/006: pick the harness.
 #   AGENT_HARNESS=opencode  → OSS path: opencode.json (LiteLLM baseURL + key +
 #                             LiteLLM-native cost metadata), `opencode run`, NO
 #                             cf-aig headers (CF gateway is the Claude path only).
-#   AGENT_HARNESS unset/""   → Claude path: byte-for-byte the Phase-1 behavior
+#   AGENT_HARNESS unset/""   → Claude path: the default behavior
 #                             (ANTHROPIC_BASE_URL + cf-aig via ANTHROPIC_CUSTOM_HEADERS).
 if [ "${AGENT_HARNESS:-}" = "opencode" ]; then
   # --- OSS / OpenCode branch ------------------------------------------------
@@ -93,26 +93,24 @@ if [ "${AGENT_HARNESS:-}" = "opencode" ]; then
   : "${OSS_MODEL_BASE_URL:?OSS_MODEL_BASE_URL required for the opencode harness}"
   step "harness=opencode"
 
-  # opencode.json mirrors the Phase-1 ANTHROPIC_CUSTOM_HEADERS assembly: the
+  # opencode.json mirrors the Claude-path ANTHROPIC_CUSTOM_HEADERS assembly: the
   # DO-minted cost tags (CF_AIG_METADATA JSON, keyed by work_item_id /
   # dispatch_id) ride as LiteLLM-native `x-litellm-metadata` extra-body — NOT
-  # cf-aig headers (Decision B / UC-3). When no tags are minted the metadata
-  # block is omitted. The provider points at the OSS (LiteLLM) endpoint.
+  # cf-aig headers. When no tags are minted the metadata block is omitted. The
+  # provider points at the OSS (LiteLLM) endpoint.
   #
-  # IMPORTANT (review D1): build the file with node + JSON.stringify, NOT a
-  # bash heredoc. The inputs (operator secrets + the allow-listed model +
-  # DO-minted cost tags) are not attacker free-text, but a stray quote/special
-  # char in any value would yield malformed JSON under string interpolation.
-  # JSON.stringify guarantees valid JSON regardless of value contents.
-  # CF_AIG_METADATA is embedded as PARSED JSON (JSON.parse) under the LiteLLM
-  # metadata field — never spliced as a raw string.
+  # IMPORTANT: build the file with node + JSON.stringify, NOT a bash heredoc.
+  # The inputs (operator secrets + the allow-listed model + DO-minted cost tags)
+  # are not attacker free-text, but a stray quote/special char in any value
+  # would yield malformed JSON under string interpolation. JSON.stringify
+  # guarantees valid JSON regardless of value contents. CF_AIG_METADATA is
+  # embedded as PARSED JSON (JSON.parse) under the LiteLLM metadata field —
+  # never spliced as a raw string.
   #
-  # NOTE (review D3): the exact LiteLLM-native metadata header/key
-  # (`x-litellm-metadata` vs `metadata`) and the extraBody nesting MUST be
-  # confirmed against the pinned LiteLLM at deploy/bake-off time (ADR-007,
-  # Slice F). OSS per-PR cost attribution (KPI-6) depends on this contract;
-  # it cannot be verified here without a live LiteLLM instance. See
-  # docs/feature/open-source-llm/deliver/upstream-issues.md (D3).
+  # NOTE: the exact LiteLLM-native metadata header/key (`x-litellm-metadata` vs
+  # `metadata`) and the extraBody nesting MUST be confirmed against the pinned
+  # LiteLLM at deploy time (ADR-007). OSS per-PR cost attribution depends on this
+  # contract; it cannot be verified here without a live LiteLLM instance.
   node -e '
     const fs = require("fs");
     const cfg = {
@@ -149,8 +147,8 @@ if [ "${AGENT_HARNESS:-}" = "opencode" ]; then
     >&2 < /dev/null
   step "opencode-ok"
 else
-  # --- Claude branch (unchanged from Phase 1) -------------------------------
-  # Per-dispatch model + AI Gateway cost headers (open-source-llm Slice A).
+  # --- Claude branch --------------------------------------------------------
+  # Per-dispatch model + AI Gateway cost headers.
   #   AGENT_MODEL      — the resolved model id (server.js carried it from the
   #                      /start body). When non-empty, pass `claude --model`.
   #   CF_AIG_METADATA  — DO-minted cost-attribution tags JSON. Becomes the

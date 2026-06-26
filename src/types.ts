@@ -4,7 +4,7 @@ export interface RegisterSessionResponse {
 export interface WaitResponse {
   dispatch_id: string | null;
   work_item_id?: string;
-  // open-source-llm Slice C / ADR-003: optional ticket `model` surfaced from the
+  // ADR-003: optional ticket `model` surfaced from the
   // MCP payload. Optional ⇒ a Metriq payload without the field deserializes fine
   // (cross-system absence-tolerance). Blank/whitespace is treated as absent by
   // resolveModel. Owned by Metriq; agent degrades to default.
@@ -29,7 +29,7 @@ export interface WorkItemSummary {
   id: string;
   title: string;
   currentState: WorkItemState;
-  // open-source-llm Slice C / ADR-003: optional ticket `model` if read via
+  // ADR-003: optional ticket `model` if read via
   // get_item. Same absence-tolerance as WaitResponse.payload.model.
   model?: string;
 }

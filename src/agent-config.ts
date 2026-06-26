@@ -19,7 +19,7 @@ export interface AgentConfigEnv {
   CONTAINER_TIMEOUT_MS?: string;
   CONTAINER_BOOT_BACKOFF_MS?: string;
   MONITOR_POLL_MS?: string;
-  // open-source-llm Slice B / ADR-002: fleet default model id.
+  // ADR-002: fleet default model id.
   // Unset ⇒ the hardcoded Claude default (the precedence floor).
   AGENT_MODEL_DEFAULT?: string;
   /**
@@ -47,13 +47,13 @@ const DEFAULT_CONTAINER_BOOT_BACKOFF_MS = 60 * 1000; // 1 min
 // Monitor-phase re-arm cadence. Must stay well under the container's
 // `sleepAfter` (10 min) so each poll resets its idle timer and keeps it awake.
 const DEFAULT_MONITOR_POLL_MS = 15 * 1000; // 15 s
-// open-source-llm Slice B / ADR-002, ADR-003: the hardcoded Claude default
-// (precedence floor) and the model allow-list (cost + injection guard). Single
-// named constants — no scattered magic strings. The SHAPE (a Claude floor + an
-// allow-list containing it) is the contract.
+// ADR-002, ADR-003: the hardcoded Claude default (precedence floor) and the
+// model allow-list (cost + injection guard). Single named constants — no
+// scattered magic strings. The SHAPE (a Claude floor + an allow-list
+// containing it) is the contract.
 //
-// Phase 1 admitted Claude ids only. Phase 2 / Slice D / ADR-006 ADDITIVELY
-// admits operator-chosen OSS provider/model ids — each a fixed, shell-safe
+// The allow-list admits Claude ids and, ADDITIVELY (ADR-006), operator-chosen
+// OSS provider/model ids — each a fixed, shell-safe
 // `provider/model` token (allow-list membership IS sanitization, ADR-003/006).
 // An allow-listed non-anthropic id routes the dispatch to OpenCode
 // (resolveHarness, ADR-005). The Claude floor + Claude ids are unchanged, so
@@ -75,7 +75,7 @@ const MODEL_ALLOW_LIST: readonly string[] = [
   "anthropic/haiku",
   "anthropic/sonnet",
   "anthropic/opus",
-  // Claude — versioned ids (Phase 1, retained additively). May resolve
+  // Claude — versioned ids (retained additively). May resolve
   // correctly for some CLI versions; the shortcuts above are the bulletproof
   // path. Kept so a deliberate operator choice of a pinned version still
   // passes allow-list membership.
@@ -83,7 +83,7 @@ const MODEL_ALLOW_LIST: readonly string[] = [
   "anthropic/claude-opus-4.7",
   "anthropic/claude-sonnet-4",
   "anthropic/claude-haiku-4",
-  // OSS ids (Phase 2 / ADR-006, additive) — route to OpenCode via the OSS
+  // OSS ids (ADR-006, additive) — route to OpenCode via the OSS
   // backend (LiteLLM by default). Operator-curated.
   "deepseek/deepseek-v3",
   "deepseek/deepseek-v3.2",
@@ -108,7 +108,7 @@ export class AgentConfig {
   readonly agentPaused: boolean;
   /** Re-arm delay used when AGENT_PAUSED is active. */
   readonly pausedRearmDelayMs: number;
-  // open-source-llm Slice B: resolved model-selection config.
+  // Resolved model-selection config.
   /** Fleet default model id. env.AGENT_MODEL_DEFAULT ?? hardcoded Claude floor. */
   readonly agentModelDefault: string;
   /** True when AGENT_MODEL_DEFAULT was set (distinguishes the two non-ticket sources). */
@@ -139,7 +139,7 @@ export class AgentConfig {
     this.mcpApiKey = env.METRIQ_API_KEY;
     this.agentPaused = parseBool(env.AGENT_PAUSED);
     this.pausedRearmDelayMs = DEFAULT_PAUSED_REARM_DELAY_MS;
-    // open-source-llm Slice B / ADR-002: typed-default pattern.
+    // ADR-002: typed-default pattern.
     this.hardcodedClaudeDefault = HARDCODED_CLAUDE_DEFAULT;
     this.modelAllowList = MODEL_ALLOW_LIST;
     this.agentModelDefaultIsFromSecret = env.AGENT_MODEL_DEFAULT !== undefined;

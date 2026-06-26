@@ -1,10 +1,10 @@
 /**
  * Pure model-resolution helper (ADR-002) + per-dispatch cost-attribution tag
- * builder (ADR-004) for the open-source-llm feature (Phase 1).
+ * builder (ADR-004) for the agent's model-selection feature.
  *
  * Both functions are pure (no I/O); the DO calls them when minting a dispatch.
- * The resolved model travels in the per-dispatch POST /start body (DESIGN
- * upstream-changes UC-1), NOT in ContainerEnv.
+ * The resolved model travels in the per-dispatch POST /start body, NOT in
+ * ContainerEnv.
  */
 
 /** Provenance of the resolved model — logged as `source=<source>`. */
@@ -52,7 +52,7 @@ export type Harness = "claude" | "opencode";
  *
  * `anthropic/*` → "claude" (the default + fallback floor); any other id
  * (OSS-shaped `provider/model`, malformed, or blank) → "opencode". The harness
- * is DERIVED from the resolved model — there is no operator flag (UC-2).
+ * is DERIVED from the resolved model — there is no operator flag.
  * Deterministic and TOTAL: NEVER throws for any string (mirrors resolveModel's
  * fail-safe discipline). The escalation path (ADR-008) coerces the resolved
  * model to the Claude floor, so a rescue dispatch resolves to "claude" here.
@@ -64,13 +64,13 @@ export function resolveHarness(model: string): Harness {
 /**
  * cf-aig-metadata / LiteLLM-native cost-attribution tag object (ADR-004 +
  * ADR-007). All fields are DO-minted / allow-list-validated — no external
- * free-text enters the JSON (injection guard). Phase 2 (ADR-007) adds two
- * DO-minted dimensions and bumps `phase`:
+ * free-text enters the JSON (injection guard). ADR-007 adds two
+ * DO-minted dimensions and bumps the `phase` tag:
  *  - `harness`     — which harness produced the request (resolveHarness output).
  *  - `fallback_of` — on a Claude rescue of a failed OSS attempt, the failed OSS
  *                    dispatch_id; `null` on a normal dispatch.
  *
- * The same object rides BOTH cost sources (Decision B): exported as
+ * The same object rides BOTH cost sources: exported as
  * `cf-aig-metadata` on the Claude/CF-gateway path, and as `x-litellm-metadata`
  * on the OSS/LiteLLM path. Schema identical; destination differs by path.
  */
@@ -90,8 +90,8 @@ export interface CostAttributionTags {
  * (ADR-004 + ADR-007). Pure.
  *
  * The object shape is fixed to DO-minted / allow-listed fields — ticket
- * title/description never spread in (injection guard). Phase 2 adds the
- * DO-minted `harness` + `fallback_of` dimensions and bumps `phase` to "2".
+ * title/description never spread in (injection guard). ADR-007 adds the
+ * DO-minted `harness` + `fallback_of` dimensions and bumps the `phase` tag to "2".
  */
 export function buildCostAttributionTags(args: {
   dispatchId: string;

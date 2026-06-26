@@ -1,9 +1,9 @@
 /**
- * Acceptance tests — model selection, Phase 1 (model default, ticket override,
+ * Acceptance tests — model selection (model default, ticket override,
  * AI Gateway cost attribution).
  *
- * These are the OUTER LOOP of Outside-In TDD: they describe observable operator
- * outcomes and drive the real Worker/DO logic through its real entry protocol
+ * These describe observable operator outcomes and drive the real Worker/DO
+ * logic through its real entry protocol
  * (the DO fetch /wake → alarm poll → /start). Harness selection / auto-escalation
  * is OUT of scope here (see harness-selection.acceptance.test.ts).
  *
@@ -37,10 +37,11 @@ import {
   type ModelSource,
 } from "../src/resolve-model";
 import { buildContainerEnvVars } from "../src/agent-container";
-// Shared DO harness (extracted to test/do-harness.ts so Phase 1 + Phase 2
-// acceptance suites share ONE copy of the alarm-clearing / isolated-storage-safe
-// driving logic — the fix for the CI UND_MOCK_ERR / "Isolated storage failed"
-// flake). Behavior identical to the previously-inlined helpers.
+// Shared DO harness (extracted to test/do-harness.ts so the model-selection and
+// harness-selection acceptance suites share ONE copy of the alarm-clearing /
+// isolated-storage-safe driving logic — the fix for the CI UND_MOCK_ERR /
+// "Isolated storage failed" flake). Behavior identical to the previously-inlined
+// helpers.
 import {
   agentStub,
   cleanupTestState,
@@ -64,7 +65,7 @@ declare module "cloudflare:test" {
 
 // The DO test harness (agentStub / installContainerHooks / drive /
 // cleanupTestState + touchedStubs) lives in ./do-harness.ts and is imported
-// above — shared verbatim with the Phase-2 acceptance suite so the
+// above — shared verbatim with the harness-selection acceptance suite so the
 // alarm-clearing / isolated-storage-safe logic is defined once. `runInDurableObject`
 // is still imported here for the per-test config overrides (testAgentModelDefault).
 
@@ -76,16 +77,15 @@ declare module "cloudflare:test" {
 // internal helper call.
 // =============================================================================
 
-describe("Operator model control — walking skeleton (US-01/US-02, journey S1+S2)", () => {
+describe("Operator model control — end to end", () => {
   beforeEach(() => {
     fetchMock.activate();
     fetchMock.disableNetConnect();
   });
   afterEach(cleanupTestState);
 
-  // @walking_skeleton @real-io @driving_port  (US-02)
-  // Real DO orchestration; faked MCP + faked container subprocess (@in-memory).
-  it("dispatches a claimed ticket on the operator's resolved model and the dispatch reaches a terminal state [@walking_skeleton @real-io @driving_port US-02]", async () => {
+  // Real DO orchestration; faked MCP + faked container subprocess.
+  it("dispatches a claimed ticket on the operator's resolved model and the dispatch reaches a terminal state", async () => {
     // GIVEN the agent already runs end-to-end with Claude as the default
     //   (AGENT_MODEL_DEFAULT unset ⇒ the hardcoded Claude default is the floor),
     //   and a Metriq ticket "Fix pagination on the orders list" is waiting.
@@ -118,7 +118,7 @@ describe("Operator model control — walking skeleton (US-01/US-02, journey S1+S
     await drive(stub);
 
     // THEN the container was told which model to run, carried in the /start body
-    //   (per-dispatch channel, UC-1) — and it equals the resolved default
+    //   (per-dispatch channel) — and it equals the resolved default
     //   (hardcoded Claude floor, since AGENT_MODEL_DEFAULT is unset).
     expect(startBodies).toHaveLength(1);
     const startBody = JSON.parse(startBodies[0]!);
@@ -139,10 +139,10 @@ describe("Operator model control — walking skeleton (US-01/US-02, journey S1+S
 });
 
 // =============================================================================
-// SLICE B — default transport (US-02). One-at-a-time: it.todo / it.skip.
+// Operator default model transport.
 // =============================================================================
 
-describe("Slice B — operator default model transport (US-02, journey S2)", () => {
+describe("Operator default model transport", () => {
   beforeEach(() => {
     fetchMock.activate();
     fetchMock.disableNetConnect();
@@ -153,7 +153,7 @@ describe("Slice B — operator default model transport (US-02, journey S2)", () 
   // The configured default is supplied via the DO test-config override
   // (testAgentModelDefault, mirroring testDailyCap); assert startBody.model ==
   // that value and source=AGENT_MODEL_DEFAULT.
-  it("runs a dispatch on the operator-configured default and forwards it in the /start body, source=AGENT_MODEL_DEFAULT [@driving_port US-02]", async () => {
+  it("runs a dispatch on the operator-configured default and forwards it in the /start body, source=AGENT_MODEL_DEFAULT", async () => {
     // GIVEN the operator configured an allow-listed fleet default via
     //   AGENT_MODEL_DEFAULT, and a Metriq ticket is waiting (no per-ticket model).
     const calls: CapturedCall[] = [];
@@ -199,11 +199,10 @@ describe("Slice B — operator default model transport (US-02, journey S2)", () 
     // Cleanup is unconditional in afterEach(cleanupTestState).
   });
 
-  // @driving_port (US-02) — unset default ⇒ hardcoded Claude floor, no regression.
-  // The explicit US-02 traceability anchor for the unset-default case (an
-  // isolated example distinct from the WS): no testAgentModelDefault override,
-  // so the DO falls through to the hardcoded Claude floor.
-  it("falls back to the hardcoded Claude default when AGENT_MODEL_DEFAULT is unset, source=hardcoded-default [@driving_port US-02]", async () => {
+  // Unset default ⇒ hardcoded Claude floor, no regression. No
+  // testAgentModelDefault override, so the DO falls through to the hardcoded
+  // Claude floor.
+  it("falls back to the hardcoded Claude default when AGENT_MODEL_DEFAULT is unset, source=hardcoded-default", async () => {
     // GIVEN AGENT_MODEL_DEFAULT is unset (no override) and a ticket is waiting.
     const calls: CapturedCall[] = [];
     const startBodies: string[] = [];
@@ -242,9 +241,8 @@ describe("Slice B — operator default model transport (US-02, journey S2)", () 
     // Cleanup is unconditional in afterEach(cleanupTestState).
   });
 
-  // @property (US-02) — resolveModel is pure: same inputs → same output, no I/O.
-  // This is the Mandate-4 pure-function tier (CM-D). RED via the throwing scaffold.
-  it("resolves the same model for the same inputs every time (pure, no I/O) [@property US-02]", () => {
+  // resolveModel is pure: same inputs → same output, no I/O.
+  it("resolves the same model for the same inputs every time (pure, no I/O)", () => {
     const args = {
       ticketModel: undefined,
       defaultModel: "anthropic/claude-opus-4",
@@ -260,20 +258,20 @@ describe("Slice B — operator default model transport (US-02, journey S2)", () 
 });
 
 // =============================================================================
-// SLICE C — ticket override + precedence + fail-safe (US-03). One-at-a-time.
+// Ticket override + precedence + fail-safe.
 // Precedence ladder: ticket > AGENT_MODEL_DEFAULT > hardcoded Claude.
 // =============================================================================
 
-describe("Slice C — per-ticket model override (US-03, journey S3)", () => {
+describe("Per-ticket model override", () => {
   beforeEach(() => {
     fetchMock.activate();
     fetchMock.disableNetConnect();
   });
   afterEach(cleanupTestState);
 
-  // @driving_port (US-03) — happy path: allow-listed ticket model overrides default.
-  it("dispatches a ticket on its own allow-listed model, overriding the operator default, source=ticket [@driving_port US-03]", async () => {
-    // GIVEN Marco set an allow-listed model on the work item.
+  // Happy path: allow-listed ticket model overrides default.
+  it("dispatches a ticket on its own allow-listed model, overriding the operator default, source=ticket", async () => {
+    // GIVEN the operator set an allow-listed model on the work item.
     const calls: CapturedCall[] = [];
     const startBodies: string[] = [];
     queueOk(calls, [
@@ -309,10 +307,10 @@ describe("Slice C — per-ticket model override (US-03, journey S3)", () => {
     // Cleanup is unconditional in afterEach(cleanupTestState).
   });
 
-  // @driving_port (US-03) [ERROR PATH] — unknown/malformed ticket model rejected,
+  // [ERROR PATH] — unknown/malformed ticket model rejected,
   // falls back to a safe default, dispatch STILL proceeds (no-strand invariant),
   // and the rejected string never appears in the /start body.
-  it("rejects an unknown ticket model, falls back to the safe default, logs the rejection, and never strands the dispatch [@driving_port US-03 error-path]", async () => {
+  it("rejects an unknown ticket model, falls back to the safe default, logs the rejection, and never strands the dispatch", async () => {
     const calls: CapturedCall[] = [];
     const startBodies: string[] = [];
     const warnSpy = vi.spyOn(console, "warn");
@@ -358,9 +356,9 @@ describe("Slice C — per-ticket model override (US-03, journey S3)", () => {
     // warnSpy restore + DO cleanup are unconditional in afterEach(cleanupTestState).
   });
 
-  // @driving_port (US-03) [ERROR PATH] — absent `model` field (cross-system: Metriq
+  // [ERROR PATH] — absent `model` field (cross-system: Metriq
   // may not expose it yet) ⇒ default used, no error (graceful degradation).
-  it("uses the default with no error when the ticket has no model field at all [@driving_port US-03 error-path]", async () => {
+  it("uses the default with no error when the ticket has no model field at all", async () => {
     const calls: CapturedCall[] = [];
     const startBodies: string[] = [];
     queueOk(calls, [
@@ -397,8 +395,8 @@ describe("Slice C — per-ticket model override (US-03, journey S3)", () => {
     // Cleanup is unconditional in afterEach(cleanupTestState).
   });
 
-  // @driving_port (US-03) [ERROR PATH] — blank/whitespace model treated as absent.
-  it("treats a blank ticket model as absent and falls through to the default with no error [@driving_port US-03 error-path]", async () => {
+  // [ERROR PATH] — blank/whitespace model treated as absent.
+  it("treats a blank ticket model as absent and falls through to the default with no error", async () => {
     const calls: CapturedCall[] = [];
     const startBodies: string[] = [];
     queueOk(calls, [
@@ -438,7 +436,7 @@ describe("Slice C — per-ticket model override (US-03, journey S3)", () => {
 
   // [ERROR PATH] pure-function tier — malformed MCP payload shape around `model`
   // resolves to a safe default and never throws (defensive). RED via scaffold.
-  it("resolves a safe default and does not throw when the ticket model is absent/blank/unknown [@property US-03 error-path]", () => {
+  it("resolves a safe default and does not throw when the ticket model is absent/blank/unknown", () => {
     const allowList = ["anthropic/claude-opus-4"] as const;
     const cases: Array<string | undefined> = [
       undefined,
@@ -458,8 +456,8 @@ describe("Slice C — per-ticket model override (US-03, journey S3)", () => {
     }
   });
 
-  // @property (US-03) — precedence ladder holds for any input combination.
-  it("honors precedence ticket > AGENT_MODEL_DEFAULT > hardcoded for any input [@property US-03]", () => {
+  // Precedence ladder holds for any input combination.
+  it("honors precedence ticket > AGENT_MODEL_DEFAULT > hardcoded for any input", () => {
     const allowList = [
       "anthropic/claude-opus-4",
       "anthropic/claude-opus-4.7",
@@ -495,15 +493,15 @@ describe("Slice C — per-ticket model override (US-03, journey S3)", () => {
 });
 
 // =============================================================================
-// SLICE A — AI Gateway interposition + per-PR cost attribution (US-01, KPI-1).
+// AI Gateway interposition + per-PR cost attribution.
 // =============================================================================
 
-describe("Slice A — AI Gateway cost visibility (US-01, journey S1)", () => {
+describe("AI Gateway cost visibility", () => {
   afterEach(cleanupTestState);
 
-  // @real-io — pure constant-env builder; no external I/O. (Slice A surface.)
+  // Pure constant-env builder; no external I/O.
   // ANTHROPIC_BASE_URL is the CONSTANT channel (ContainerEnv), NOT the /start body.
-  it("forwards the AI Gateway endpoint as the constant ANTHROPIC_BASE_URL into the container [@real-io US-01]", () => {
+  it("forwards the AI Gateway endpoint as the constant ANTHROPIC_BASE_URL into the container", () => {
     const vars = buildContainerEnvVars({
       GITHUB_PAT: "pat",
       GITHUB_USER: "agent",
@@ -522,7 +520,7 @@ describe("Slice A — AI Gateway cost visibility (US-01, journey S1)", () => {
   // [ERROR/EDGE PATH] AI_GATEWAY_TOKEN set ⇒ forwarded; unset ⇒ omitted (no
   // broken/empty header). Membership of the key, not an empty string, is the
   // signal entrypoint.sh uses to add cf-aig-authorization.
-  it("forwards AI_GATEWAY_TOKEN when set and omits it entirely when unset [@real-io US-01 error-path]", () => {
+  it("forwards AI_GATEWAY_TOKEN when set and omits it entirely when unset", () => {
     const withToken = buildContainerEnvVars({
       GITHUB_PAT: "pat",
       GITHUB_USER: "agent",
@@ -542,11 +540,11 @@ describe("Slice A — AI Gateway cost visibility (US-01, journey S1)", () => {
     expect("AI_GATEWAY_TOKEN" in withoutToken).toBe(false);
   });
 
-  // Task 3 (open-source-readiness): TARGET_REPO / TARGET_BASE_BRANCH are
-  // deploy-time constants forwarded into the container so the agent can clone +
+  // TARGET_REPO / TARGET_BASE_BRANCH are deploy-time constants forwarded into
+  // the container so the agent can clone +
   // open PRs against any repo. TARGET_REPO is required at the container boundary
   // (entrypoint.sh fails fast when empty); TARGET_BASE_BRANCH defaults to "main".
-  it("forwards TARGET_REPO and TARGET_BASE_BRANCH when set [@real-io]", () => {
+  it("forwards TARGET_REPO and TARGET_BASE_BRANCH when set", () => {
     const vars = buildContainerEnvVars({
       GITHUB_PAT: "p",
       GITHUB_USER: "u",
@@ -558,13 +556,12 @@ describe("Slice A — AI Gateway cost visibility (US-01, journey S1)", () => {
     expect(vars.TARGET_BASE_BRANCH).toBe("main");
   });
 
-  // @kpi (US-01, KPI-1) — every cost-tagged dispatch carries the attribution
-  // tags populated from DO-minted / allow-listed values, so per-PR cost is
-  // queryable. ADR-007 (Phase 2) EXTENDS the Phase-1 schema: it adds the
-  // DO-minted `harness` + `fallback_of` dimensions and bumps `phase` 1→2. This
-  // Phase-1 assertion is updated to the evolved schema (ADR-007 "Phase-1 tests
-  // update"). Also the ADR-004 injection guard: no external free text.
-  it("emits cost-attribution tags with all DO-minted dimensions (incl. harness + fallback_of, phase 2) so per-PR cost is attributable [@kpi US-01 KPI-1]", () => {
+  // Every cost-tagged dispatch carries the attribution tags populated from
+  // DO-minted / allow-listed values, so per-PR cost is queryable. ADR-007
+  // EXTENDS the base schema: it adds the DO-minted `harness` + `fallback_of`
+  // dimensions and bumps the `phase` tag to "2". Also the ADR-004 injection
+  // guard: no external free text.
+  it("emits cost-attribution tags with all DO-minted dimensions (incl. harness + fallback_of, phase tag = 2) so per-PR cost is attributable", () => {
     const tags = buildCostAttributionTags({
       dispatchId: "f3a9c2de-0000-0000-0000-000000000000",
       workItemId: "WI-3088",
@@ -584,10 +581,10 @@ describe("Slice A — AI Gateway cost visibility (US-01, journey S1)", () => {
     });
   });
 
-  // @kpi (US-01) [INJECTION GUARD] — no external free-text (ticket title/body)
+  // [INJECTION GUARD] — no external free-text (ticket title/body)
   // can leak into the cost tags; every value is a DO-minted/allow-listed token.
-  // ADR-007 (Phase 2): the schema is now eight fixed fields (still no title/body).
-  it("never places external free-text in the cost tags (injection guard) [@kpi US-01 error-path]", () => {
+  // ADR-007: the schema is now eight fixed fields (still no title/body).
+  it("never places external free-text in the cost tags (injection guard)", () => {
     const tags = buildCostAttributionTags({
       dispatchId: "abc",
       workItemId: "WI-1",
@@ -610,13 +607,13 @@ describe("Slice A — AI Gateway cost visibility (US-01, journey S1)", () => {
     );
   });
 
-  // @kpi (US-01) [EDGE] — a rescued/retried ticket yields two request rows that
-  // roll up to ONE ticket via work_item_id (US-01 Domain Example 2). Proven at
+  // [EDGE] — a rescued/retried ticket yields two request rows that
+  // roll up to ONE ticket via work_item_id. Proven at
   // the DO level: each dispatch mints its own dispatch_id/short_id, but the
   // work_item_id in cost_tags is the STABLE claimed item id — so two retried
   // dispatches (distinct dispatch_id) for the same ticket collapse onto one
   // work_item_id, and per-PR cost is not double-counted.
-  it("rolls retried dispatches up to one ticket via work_item_id so per-PR cost is not double-counted [@kpi US-01 edge]", async () => {
+  it("rolls retried dispatches up to one ticket via work_item_id so per-PR cost is not double-counted", async () => {
     // A retried ticket yields TWO dispatches (e.g. the first was reclaimed by
     // the sweeper, a second DO picked it up) — distinct dispatch_id each, but
     // the SAME work_item_id. Model that with two independent DO instances, each
@@ -682,7 +679,7 @@ describe("AI Gateway / Claude contract smoke [@requires_external]", () => {
   // workers pool. Lives in deployed e2e; recorded here as the Strategy-B
   // real-I/O escape hatch for the costly `claude -p` path.
   it.skip("real claude honors ANTHROPIC_BASE_URL and --model [@requires_external]", () => {
-    // Intentionally unimplemented in the workers pool. See distill/walking-skeleton.md.
+    // Intentionally unimplemented in the workers pool (real-I/O escape hatch).
     expect(true).toBe(true);
   });
 });

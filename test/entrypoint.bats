@@ -59,7 +59,7 @@ echo "$@" >> "$CLAUDE_LOG"
 } >> "$CLAUDE_ENV_LOG"
 STUB_EOF
 
-  # open-source-llm Phase 2 / Slice D: stub `opencode` (the OSS harness). Logs
+  # Stub `opencode` (the OSS harness). Logs
   # its args + the generated opencode.json so tests can assert the OSS-branch
   # wiring (model, baseURL, key, LiteLLM-native metadata) without a real model.
   OPENCODE_LOG="$STUB_DIR/opencode.log"
@@ -85,7 +85,7 @@ STUB_EOF
   export WORK_ITEM_ID="wi-test"
   export DISPATCH_ID="d-test-1234abcd"
   export SHORT_ID="ab12cd34"
-  export TITLE="Hello slice 4"
+  export TITLE="Hello world"
   export DESCRIPTION="demo"
   export GITHUB_PAT="pat-xxx"
   export GITHUB_USER="metriq-agent"
@@ -128,7 +128,7 @@ teardown() {
   # --dangerously-skip-permissions required so claude can actually edit files
   grep -q -- "--dangerously-skip-permissions" "$CLAUDE_LOG"
   # Prompt must include the title and description text
-  grep -q "Hello slice 4" "$CLAUDE_LOG"
+  grep -q "Hello world" "$CLAUDE_LOG"
   grep -q "demo" "$CLAUDE_LOG"
 }
 
@@ -148,7 +148,7 @@ STUB_EOF
 @test "gh pr create targets the default base (main) with correct head/title/body" {
   run "$ENTRYPOINT"
   [ "$status" -eq 0 ]
-  grep -q "^pr create --base main --head agent/ab12cd34 --title Hello slice 4 --body Closes Metriq ticket #wi-test$" "$GH_LOG"
+  grep -q "^pr create --base main --head agent/ab12cd34 --title Hello world --body Closes Metriq ticket #wi-test$" "$GH_LOG"
 }
 
 # ---- open-source-readiness Task 3: required target repo + base branch ----
@@ -266,7 +266,7 @@ STUB_EOF
   [ "$status" -ne 0 ]
 }
 
-# ---- open-source-llm Slice A (01-04): per-dispatch model + cf-aig headers ----
+# ---- per-dispatch model + cf-aig headers ----
 
 @test "strips anthropic/ prefix before passing --model to claude (CLI rejects the provider prefix)" {
   # The agent's allow-list shape (anthropic/<id>) is the harness-routing key
@@ -302,7 +302,7 @@ STUB_EOF
   echo "$output" | grep -q "model=anthropic/opus cli=opus"
 }
 
-@test "does NOT pass --model when AGENT_MODEL is empty/unset (pre-Phase-1 behavior preserved)" {
+@test "does NOT pass --model when AGENT_MODEL is empty/unset (default behavior preserved)" {
   export AGENT_MODEL=""
   run "$ENTRYPOINT"
   [ "$status" -eq 0 ]
@@ -347,13 +347,12 @@ STUB_EOF
   ! grep -q "cf-aig-metadata" "$CLAUDE_ENV_LOG"
 }
 
-# ---- open-source-llm Phase 2 / Slice D: OpenCode harness branch -------------
-# These are RED until DELIVER adds the AGENT_HARNESS=opencode branch to
-# entrypoint.sh (the script currently always runs `claude`). They drive the
-# OSS-path wiring: generate opencode.json from the forwarded env (LiteLLM
-# baseURL + key + LiteLLM-native cost metadata), then `opencode run --model …
-# --dangerously-skip-permissions "<positional task>"`. NO cf-aig-* on the OSS
-# path (Decision B). The Claude branch stays byte-for-byte Phase 1.
+# ---- OpenCode harness branch -----------------------------------------------
+# These drive the AGENT_HARNESS=opencode branch in entrypoint.sh: generate
+# opencode.json from the forwarded env (LiteLLM baseURL + key + LiteLLM-native
+# cost metadata), then `opencode run --model … --dangerously-skip-permissions
+# "<positional task>"`. NO cf-aig-* on the OSS path. The Claude branch is
+# unaffected.
 
 @test "OpenCode branch: invokes 'opencode run --model <id> --dangerously-skip-permissions' with the task positionally" {
   export AGENT_HARNESS="opencode"
@@ -367,7 +366,7 @@ STUB_EOF
   grep -q -- "--model deepseek/deepseek-v3" "$OPENCODE_LOG"
   grep -q -- "--dangerously-skip-permissions" "$OPENCODE_LOG"
   # The task text (title) is passed positionally (OpenCode has no -p for prompt).
-  grep -q "Hello slice 4" "$OPENCODE_LOG"
+  grep -q "Hello world" "$OPENCODE_LOG"
   ! grep -q -- "-p " "$OPENCODE_LOG"
   # The Claude branch must NOT have run on the OSS path.
   [ ! -s "$CLAUDE_LOG" ] || ! grep -q -- "--model" "$CLAUDE_LOG"
@@ -388,12 +387,12 @@ STUB_EOF
   # dispatch_id (ADR-005/007) — NOT cf-aig headers.
   grep -q "wi-test" "$OPENCODE_JSON_LOG"
   grep -q "x-litellm-metadata" "$OPENCODE_JSON_LOG"
-  # Decision B: NO cf-aig-* anywhere on the OSS path.
+  # NO cf-aig-* anywhere on the OSS path.
   ! grep -q "cf-aig-authorization" "$OPENCODE_JSON_LOG"
   ! grep -q "cf-aig-metadata" "$OPENCODE_JSON_LOG"
 }
 
-@test "OpenCode branch: opencode.json is always VALID JSON even when a value contains a double-quote (review D1)" {
+@test "OpenCode branch: opencode.json is always VALID JSON even when a value contains a double-quote" {
   export AGENT_HARNESS="opencode"
   export AGENT_MODEL="deepseek/deepseek-v3"
   # A stray double-quote in an operator secret / cost tag must NOT corrupt the
