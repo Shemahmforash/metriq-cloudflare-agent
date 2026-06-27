@@ -218,15 +218,29 @@ path — either a direct `ANTHROPIC_API_KEY`, or the AI Gateway path
 > `--dangerously-skip-permissions` inside a disposable container, on the
 > **ticket's title/description as its prompt**. Treat ticket submission as a
 > trusted, authenticated path: a maliciously-crafted ticket is a prompt-injection
-> vector that can drive the agent's tools. Two controls bound the blast radius —
-> keep both tight:
+> vector that can drive the agent's tools. The **`GITHUB_PAT` is the secret worth
+> protecting** — a stolen one could push to `TARGET_REPO` outside the
+> human-review gate. The **load-bearing controls are operator-side** — keep them
+> all tight:
 > - **Scope the `GITHUB_PAT`** to `TARGET_REPO` only (fine-grained, `Contents` +
 >   `Pull requests` write). A broad classic `repo` token would let an injected
 >   ticket reach *every* repo your account can write to.
+> - **Turn on branch protection on `TARGET_REPO`** (require a PR review before
+>   merge to the default branch). This is the real backstop: even if the PAT
+>   leaked, it couldn't merge code without a human — preserving the
+>   agent-proposes / human-blesses model.
 > - **Keep `TARGET_REPO` and the ticket source under your control.** Don't point
->   this at a public/untrusted intake queue without first hardening the agent's
->   container env (the agent process currently inherits deploy secrets; see the
->   project's security backlog).
+>   this at a public/untrusted intake queue.
+>
+> In the container, the GitHub creds are kept out of the agent's reach by default:
+> the repo is cloned **tokenless** (auth via a call-time credential helper, so the
+> PAT is never written to `.git/config`) and `GITHUB_PAT`/`GH_TOKEN` are
+> **scrubbed from the agent's env** (`env -u`) — all `git`/`gh` work runs in the
+> entrypoint before/after the agent. These close the *trivial* read paths but are
+> **bar-raisers, not an isolation boundary**: the agent runs as the same uid as
+> the entrypoint, so a determined prompt-injected agent could still reach the PAT
+> via `/proc`, and the model API key is irreducibly in its env. That's why the
+> operator-side controls above are the ones that actually bound the damage.
 
 ### Run the Worker locally
 

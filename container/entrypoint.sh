@@ -26,12 +26,31 @@ step() { echo "[step] $*" >&2; }
 DESCRIPTION="${DESCRIPTION:-}"
 step "env-ok short_id=${SHORT_ID} work_item_id=${WORK_ITEM_ID}"
 
-# gh CLI auth via env, no interactive login needed.
+# gh CLI auth via env, no interactive login needed. This (and GITHUB_PAT) are
+# SCRUBBED from the agent's own env at invocation time — see the `env -u` wrappers
+# on the claude/opencode calls below. The git/gh plumbing that needs them runs
+# in THIS process, before and after the agent.
 export GH_TOKEN="$GITHUB_PAT"
 
 # git identity for the agent's commits.
 git config --global user.email "${GITHUB_USER}@users.noreply.github.com"
 git config --global user.name "$GITHUB_USER"
+
+# SECURITY (cheap-tier PAT hardening): auth via a credential helper scoped to
+# https://github.com that emits $GITHUB_PAT at call time — NOT an in-URL token.
+# An in-URL token (the old form) gets written into .git/config inside the repo
+# the untrusted agent works in, where `cat .git/config` would hand it over. The
+# helper stores only the literal "${GITHUB_PAT}" reference; git resolves it from
+# the env of the git process at call time. Clone + push run in THIS process (PAT
+# present) so they authenticate; if the scrubbed agent runs its own `git push`
+# the reference expands to empty and auth simply fails — a useful side effect.
+# Host-scoped on purpose: an unconditional helper would let a repointed remote
+# leak the PAT to an attacker host. NOTE: this is a bar-raiser, not a boundary —
+# the PAT still lives in PID 1's env (reachable via /proc by a same-uid agent).
+# The load-bearing controls are operator-side: a fine-grained single-repo PAT +
+# branch protection on TARGET_REPO. See docs/security/.
+git config --global credential."https://github.com".helper \
+  '!f() { echo "username=x-access-token"; echo "password=${GITHUB_PAT}"; }; f'
 step "git-config-ok"
 
 WORK_DIR=$(mktemp -d)
@@ -47,7 +66,9 @@ if [ -z "${TARGET_REPO:-}" ]; then
   exit 1
 fi
 TARGET_BASE_BRANCH="${TARGET_BASE_BRANCH:-main}"
-REPO_URL="https://x-access-token:${GITHUB_PAT}@github.com/${TARGET_REPO}.git"
+# Tokenless URL — auth comes from the call-time credential helper above, so the
+# PAT value never lands in .git/config where the agent could read it.
+REPO_URL="https://github.com/${TARGET_REPO}.git"
 step "clone-start target_repo=${TARGET_REPO}"
 git clone --depth 1 "$REPO_URL" repo
 cd repo
@@ -147,8 +168,12 @@ if [ "${AGENT_HARNESS:-}" = "opencode" ]; then
   # OpenCode takes the task positionally (no `-p`). stdout → stderr so the
   # harness output never reaches entrypoint stdout (parseLastUrl reads the PR
   # URL there). `--dangerously-skip-permissions` so it can actually edit files.
+  # SECURITY: scrub the GitHub creds from the agent's env. The OSS agent runs
+  # untrusted ticket text with --dangerously-skip-permissions; it only edits
+  # files and never needs GITHUB_PAT/GH_TOKEN (all git/gh work is done by this
+  # script before/after). Removes the trivial read path (`echo $GITHUB_PAT`).
   step "opencode-start"
-  opencode run \
+  env -u GITHUB_PAT -u GH_TOKEN opencode run \
     --model "$AGENT_MODEL" \
     --dangerously-skip-permissions \
     "$AGENT_PROMPT" \
@@ -215,7 +240,12 @@ ${auth_line}"
   # `claude -p` cannot actually use Write/Edit/Bash tools (PR comes through
   # empty). The flag's "dangerous" naming is for use on developer machines;
   # for this ephemeral one-shot container, it's the correct permission mode.
-  claude \
+  #
+  # SECURITY: scrub the GitHub creds from the agent's env. The agent runs
+  # untrusted ticket text with --dangerously-skip-permissions; it only edits
+  # files and never needs GITHUB_PAT/GH_TOKEN (all git/gh work is done by this
+  # script before/after). Removes the trivial read path (`echo $GITHUB_PAT`).
+  env -u GITHUB_PAT -u GH_TOKEN claude \
     --dangerously-skip-permissions \
     "${MODEL_ARGS[@]}" \
     -p "$AGENT_PROMPT" \

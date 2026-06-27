@@ -53,9 +53,13 @@ echo "$@" >> "$CLAUDE_LOG"
 # Capture the header-relevant env claude reads, so tests can assert what
 # entrypoint.sh assembled. ANTHROPIC_BASE_URL is set by ContainerEnv (claude
 # reads it directly); ANTHROPIC_CUSTOM_HEADERS is assembled by entrypoint.sh.
+# Also capture the GitHub creds so a test can assert they are SCRUBBED from the
+# untrusted agent's env (it runs ticket text with --dangerously-skip-permissions).
 {
   echo "ANTHROPIC_CUSTOM_HEADERS=${ANTHROPIC_CUSTOM_HEADERS:-}"
   echo "ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-}"
+  echo "GITHUB_PAT=${GITHUB_PAT:-<unset>}"
+  echo "GH_TOKEN=${GH_TOKEN:-<unset>}"
 } >> "$CLAUDE_ENV_LOG"
 STUB_EOF
 
@@ -64,10 +68,17 @@ STUB_EOF
   # wiring (model, baseURL, key, LiteLLM-native metadata) without a real model.
   OPENCODE_LOG="$STUB_DIR/opencode.log"
   OPENCODE_JSON_LOG="$STUB_DIR/opencode-json.log"
-  export OPENCODE_LOG OPENCODE_JSON_LOG
+  OPENCODE_ENV_LOG="$STUB_DIR/opencode-env.log"
+  export OPENCODE_LOG OPENCODE_JSON_LOG OPENCODE_ENV_LOG
   cat > "$STUB_DIR/opencode" <<'STUB_EOF'
 #!/bin/sh
 echo "$@" >> "$OPENCODE_LOG"
+# Capture the GitHub creds so a test can assert they are SCRUBBED from the
+# untrusted OSS agent's env (same threat as the Claude path).
+{
+  echo "GITHUB_PAT=${GITHUB_PAT:-<unset>}"
+  echo "GH_TOKEN=${GH_TOKEN:-<unset>}"
+} >> "$OPENCODE_ENV_LOG"
 # entrypoint.sh writes the config OUTSIDE the repo and points opencode at it via
 # OPENCODE_CONFIG. Capture it so tests can assert the provider block
 # (baseURL/apiKey/metadata).
@@ -455,5 +466,55 @@ STUB_EOF
   grep -q -- "--model opus" "$CLAUDE_LOG"
   grep -q 'cf-aig-metadata' "$CLAUDE_ENV_LOG"
   [ ! -s "$OPENCODE_LOG" ]
+}
+
+# ---- PAT hardening (cheap tier): tokenless clone + call-time helper + agent env scrub ----
+# Threat: the agent runs untrusted ticket text with --dangerously-skip-permissions
+# as the same uid as this script. These controls remove the TRIVIAL PAT read paths
+# (`cat .git/config`, `echo $GITHUB_PAT`). They are bar-raisers, not an isolation
+# boundary (the PAT still lives in PID 1's env, reachable via /proc) — see
+# docs/security. The load-bearing controls are operator-side: a fine-grained,
+# single-repo PAT + branch protection on TARGET_REPO.
+
+@test "security: clone is tokenless — the PAT value is never baked into the clone URL" {
+  run "$ENTRYPOINT"
+  [ "$status" -eq 0 ]
+  # Auth comes from a credential helper, not an in-URL token, so the PAT value
+  # never lands in .git/config where the untrusted agent could just read it.
+  grep -q "^clone --depth 1 https://github.com/example/target-repo.git repo$" "$GIT_LOG"
+  # The PAT value ("pat-xxx" in this test) must not appear in ANY git command.
+  ! grep -q "pat-xxx" "$GIT_LOG"
+}
+
+@test "security: git auth uses a github.com-scoped, call-time credential helper (PAT not on disk)" {
+  run "$ENTRYPOINT"
+  [ "$status" -eq 0 ]
+  # Helper is scoped to https://github.com (NOT a host-unconditional helper an
+  # agent could weaponize by repointing the remote) and emits the literal
+  # ${GITHUB_PAT} reference, resolved by git at call time — so the value is never
+  # written to disk and never shows in the git log.
+  grep -q "credential.https://github.com.helper" "$GIT_LOG"
+  grep -q 'password=${GITHUB_PAT}' "$GIT_LOG"
+  ! grep -q "pat-xxx" "$GIT_LOG"
+}
+
+@test "security: the Claude agent runs with GITHUB_PAT and GH_TOKEN scrubbed from its env" {
+  run "$ENTRYPOINT"
+  [ "$status" -eq 0 ]
+  # The git/gh plumbing runs before/after the agent and still has the creds; the
+  # agent itself only edits files, so it gets neither. Removes `echo $GITHUB_PAT`.
+  grep -q "^GITHUB_PAT=<unset>$" "$CLAUDE_ENV_LOG"
+  grep -q "^GH_TOKEN=<unset>$" "$CLAUDE_ENV_LOG"
+}
+
+@test "security: the OpenCode agent runs with GITHUB_PAT and GH_TOKEN scrubbed from its env" {
+  export AGENT_HARNESS="opencode"
+  export AGENT_MODEL="deepseek/deepseek-v3"
+  export OSS_MODEL_BASE_URL="https://litellm.internal/v1"
+  export OSS_MODEL_API_KEY="sk-litellm-123"
+  run "$ENTRYPOINT"
+  [ "$status" -eq 0 ]
+  grep -q "^GITHUB_PAT=<unset>$" "$OPENCODE_ENV_LOG"
+  grep -q "^GH_TOKEN=<unset>$" "$OPENCODE_ENV_LOG"
 }
 

@@ -26,6 +26,37 @@ the report is triaged.
   and logs). `wrangler secret put NAME` reads the value from an interactive
   prompt or stdin only.
 
+## The agent container and the GitHub PAT
+
+Each dispatch runs an LLM coding agent with `--dangerously-skip-permissions` on
+untrusted ticket text — a prompt-injection vector. The **GitHub PAT** is the
+secret worth protecting: a stolen one could push to `TARGET_REPO` outside the
+human-review gate.
+
+In the container (`container/entrypoint.sh`):
+
+- the repo is cloned **tokenless** — auth comes from a call-time `git` credential
+  helper scoped to `https://github.com`, so the PAT value is never written to
+  `.git/config` where the agent could read it;
+- `GITHUB_PAT` / `GH_TOKEN` are **scrubbed from the agent's env** (`env -u`); the
+  agent only edits files, and all `git`/`gh` work runs in the entrypoint before
+  and after it.
+
+These remove the *trivial* read paths but are **bar-raisers, not an isolation
+boundary** — the agent shares the entrypoint's uid, so the PAT remains reachable
+via `/proc`, and the model API key is irreducibly in the agent's env. The
+**load-bearing** controls are operator-side and live on `TARGET_REPO`:
+
+- a **fine-grained, single-repo PAT** (`Contents` + `Pull requests` write) bounds
+  what a stolen token can touch;
+- **branch protection requiring PR review** ensures even a stolen PAT can't merge
+  without a human.
+
+We deliberately do **not** run a secret-scanner inside the container: it would be
+bypassable from the same prompt-injection position (an agent can plant a
+`.gitleaks.toml` to neuter it) and duplicates GitHub's own **push protection**.
+Enable secret-scanning push protection on `TARGET_REPO` instead.
+
 ## Access control on the public Worker
 
 The control and debug routes (`/wake`, `/stop`, `/pause`, `/resume`, `/debug`)
