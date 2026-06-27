@@ -6,6 +6,8 @@ Cloudflare-hosted runtime for the Metriq agent loop. When a human dispatches a t
 
 A Cloudflare Worker fronts a **`MetriqAgentLoop`** Durable Object that holds an agent session open against Metriq's HTTP MCP server and long-polls for work. On a dispatch hit the DO boots a **`AgentContainer`** Cloudflare Container (Node 24 + `git` + `gh` + `pnpm` + `claude-code`), which clones the target repo and runs `claude -p` against the ticket. The container prints the PR URL on stdout; the DO captures it, reports it as the artifact, and moves the work item to `done` (with `reviewRequired: true` so a human still blesses before merge).
 
+This is the **reference implementation of Metriq's [BYO agent protocol](https://www.metriq.sh/docs/agents)** — the five-tool MCP loop (plus session bookends) that any agent calls to source and complete Metriq work. That page is the runtime contract this repo conforms to; the [MCP tool catalog](https://www.metriq.sh/docs/reference/mcp-tools) carries the authoritative tool schemas. Read those to understand *what* the agent talks to; read on here for *how* to deploy and run it.
+
 ## What you need to run this yourself
 
 To deploy and run your own instance you'll need:
@@ -344,6 +346,16 @@ These are load-bearing. Read them before touching code.
 
 ## Reference
 
-Architecture and design rationale live in [`docs/`](docs/README.md) — the ADRs
-under `docs/product/architecture/`, plus the open-source-LLM feasibility research
-under `docs/research/`.
+**Metriq side (the runtime contract this implements):**
+
+- [BYO agent protocol](https://www.metriq.sh/docs/agents) — the five-tool MCP
+  loop + session bookends every agent conforms to. This repo is its reference
+  implementation.
+- [MCP tool catalog](https://www.metriq.sh/docs/reference/mcp-tools) — the
+  authoritative input/output schemas for the tools the agent calls
+  (`wait_for_assignment`, `claim_assigned_task`, `report_artifact`, `move_item`,
+  …). Each is also self-described over MCP via `tools/list`.
+
+**This repo (how it's built and run):** architecture and design rationale live
+in [`docs/`](docs/README.md) — the ADRs under `docs/product/architecture/`, plus
+the open-source-LLM feasibility research under `docs/research/`.
