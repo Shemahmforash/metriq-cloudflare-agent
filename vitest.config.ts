@@ -6,6 +6,13 @@ export default defineWorkersConfig({
     // tests (test/*.test.mjs) run via `node --test` — they import node:test and
     // node:child_process, which don't exist in the workerd runtime.
     include: ["test/**/*.test.ts"],
+    // Retry on CI ONLY, to absorb the rare @cloudflare/vitest-pool-workers
+    // cross-file isolated-storage flake ("Isolated storage failed … .sqlite-shm")
+    // that surfaces under CI timing/resource pressure and passes on re-run. Local
+    // runs stay strict (retry: 0) so genuinely flaky tests surface during dev. A
+    // persistently failing test still fails — only the rare isolation race is
+    // absorbed, not real breakage.
+    retry: process.env.CI ? 2 : 0,
     poolOptions: {
       workers: {
         wrangler: { configPath: "./wrangler.toml" },
