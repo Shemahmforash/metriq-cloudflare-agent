@@ -151,7 +151,7 @@ path — either a direct `ANTHROPIC_API_KEY`, or the AI Gateway path
 |---|---|
 | `METRIQ_API_KEY` | Bearer token for the Metriq **Cloudflare Agent** identity (Settings → Agents → reveal) |
 | `METRIQ_MCP_URL` | Your Metriq MCP HTTP endpoint, e.g. `https://<your-metriq-host>/api/v1/mcp` |
-| `GITHUB_PAT` | Classic PAT (`ghp_…`) for the GitHub user the agent commits as, scope `repo` |
+| `GITHUB_PAT` | PAT for the GitHub user the agent commits as. **Use a fine-grained token scoped to `TARGET_REPO` only**, with `Contents: Read and write` + `Pull requests: Read and write` — *not* a classic `repo`-scoped token. This token is the blast-radius control (see the security note below). |
 | `GITHUB_USER` | The GitHub username that owns the PAT |
 | `TARGET_REPO` | **Required, no default.** `owner/name` the agent clones + opens PRs against. The `GITHUB_PAT` must have push + PR access to it. The container fails fast if this is unset. See **Point it at your own repo** below. |
 | `ANTHROPIC_API_KEY` | Anthropic API key with credit balance — `claude -p` calls this. **Required unless** you use the AI Gateway path below. |
@@ -168,6 +168,20 @@ path — either a direct `ANTHROPIC_API_KEY`, or the AI Gateway path
 | `RETRY_DELAY_MS` *(optional)* | gap between `report_artifact`/`move_item` retry. Default `5000` (5s). |
 | `ALERT_GITHUB_REPO` *(optional)* | `owner/name` where container-fail-to-boot events file a GitHub Issue (reuses `GITHUB_PAT` for auth). **No hardcoded default** — falls back to `TARGET_REPO`; if both are unset, alerting is skipped. Set it to a repo you own if you want alerts somewhere other than `TARGET_REPO`. |
 | `TARGET_BASE_BRANCH` *(optional)* | PR base branch on `TARGET_REPO`. Default `main`. |
+
+> ⚠️ **Security — trust model.** Each dispatch runs a coding LLM with
+> `--dangerously-skip-permissions` inside a disposable container, on the
+> **ticket's title/description as its prompt**. Treat ticket submission as a
+> trusted, authenticated path: a maliciously-crafted ticket is a prompt-injection
+> vector that can drive the agent's tools. Two controls bound the blast radius —
+> keep both tight:
+> - **Scope the `GITHUB_PAT`** to `TARGET_REPO` only (fine-grained, `Contents` +
+>   `Pull requests` write). A broad classic `repo` token would let an injected
+>   ticket reach *every* repo your account can write to.
+> - **Keep `TARGET_REPO` and the ticket source under your control.** Don't point
+>   this at a public/untrusted intake queue without first hardening the agent's
+>   container env (the agent process currently inherits deploy secrets; see the
+>   project's security backlog).
 
 ### Run the Worker locally
 

@@ -2,7 +2,9 @@
 # Force linux/amd64 — Cloudflare Containers run amd64; building on M-series
 # Macs without this can ship arm64 native binaries (esbuild, etc.) that
 # crash at dispatch time.
-FROM --platform=linux/amd64 node:24-slim
+# Pinned by digest (supply-chain integrity): the mutable tag is kept in the
+# trailing comment for legibility. Re-resolve + bump deliberately when updating.
+FROM --platform=linux/amd64 node:24-slim@sha256:b31e7a42fdf8b8aa5f5ed477c72d694301273f1069c5a2f71d53c6482e99a2fc # node:24-slim
 
 # git for clone, gh for PR, pnpm via corepack. curl + ca-certificates needed
 # only for the gh APT repo bootstrap.
@@ -23,8 +25,13 @@ RUN apt-get update \
 RUN corepack enable
 
 # Claude Code CLI — invoked by entrypoint.sh as `claude -p "Task: ..."`
-# using ANTHROPIC_API_KEY from the container env.
-RUN npm install -g @anthropic-ai/claude-code
+# using ANTHROPIC_API_KEY from the container env. Pinned EXACTLY (supply-chain
+# integrity): this is the most-privileged binary in the image — it runs
+# --dangerously-skip-permissions with secrets in env — so it must not float on
+# trust-on-first-use. Bump deliberately, mirroring opencode-ai below.
+RUN npm install -g @anthropic-ai/claude-code@2.1.195
+# Fail the build early if the install is broken (no network/creds for --version).
+RUN claude --version
 
 # OpenCode CLI — the OSS harness. entrypoint.sh invokes it as
 # `opencode run --model … "<task>"` when AGENT_HARNESS=opencode (the

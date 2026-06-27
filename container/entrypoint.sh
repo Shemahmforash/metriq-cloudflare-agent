@@ -99,6 +99,12 @@ if [ "${AGENT_HARNESS:-}" = "opencode" ]; then
   # cf-aig headers. When no tags are minted the metadata block is omitted. The
   # provider points at the OSS (LiteLLM) endpoint.
   #
+  # SECURITY: write the config OUTSIDE the cloned repo and point opencode at it
+  # via OPENCODE_CONFIG. The file carries OSS_MODEL_API_KEY, so if it lived in
+  # the repo working tree the later `git add -A` would stage it and publish the
+  # key in the PR diff. Keeping it in $WORK_DIR (the repo's parent) means
+  # `git add -A` — which only sees the repo — can never reach it.
+  #
   # IMPORTANT: build the file with node + JSON.stringify, NOT a bash heredoc.
   # The inputs (operator secrets + the allow-listed model + DO-minted cost tags)
   # are not attacker free-text, but a stray quote/special char in any value
@@ -111,6 +117,8 @@ if [ "${AGENT_HARNESS:-}" = "opencode" ]; then
   # `metadata`) and the extraBody nesting MUST be confirmed against the pinned
   # LiteLLM at deploy time (ADR-007). OSS per-PR cost attribution depends on this
   # contract; it cannot be verified here without a live LiteLLM instance.
+  OPENCODE_CONFIG="${WORK_DIR}/opencode.json"
+  export OPENCODE_CONFIG
   node -e '
     const fs = require("fs");
     const cfg = {
@@ -132,9 +140,9 @@ if [ "${AGENT_HARNESS:-}" = "opencode" ]; then
     if (raw) {
       cfg.options = { extraBody: { "x-litellm-metadata": JSON.parse(raw) } };
     }
-    fs.writeFileSync("opencode.json", JSON.stringify(cfg, null, 2) + "\n");
+    fs.writeFileSync(process.env.OPENCODE_CONFIG, JSON.stringify(cfg, null, 2) + "\n");
   '
-  step "opencode-json-written"
+  step "opencode-json-written path=${OPENCODE_CONFIG}"
 
   # OpenCode takes the task positionally (no `-p`). stdout → stderr so the
   # harness output never reaches entrypoint stdout (parseLastUrl reads the PR

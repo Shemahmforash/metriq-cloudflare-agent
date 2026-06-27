@@ -68,10 +68,17 @@ STUB_EOF
   cat > "$STUB_DIR/opencode" <<'STUB_EOF'
 #!/bin/sh
 echo "$@" >> "$OPENCODE_LOG"
-# entrypoint.sh writes opencode.json into CWD before invoking `opencode run`.
-# Capture it so tests can assert the provider block (baseURL/apiKey/metadata).
+# entrypoint.sh writes the config OUTSIDE the repo and points opencode at it via
+# OPENCODE_CONFIG. Capture it so tests can assert the provider block
+# (baseURL/apiKey/metadata).
+if [ -n "$OPENCODE_CONFIG" ] && [ -f "$OPENCODE_CONFIG" ]; then
+  cat "$OPENCODE_CONFIG" >> "$OPENCODE_JSON_LOG"
+fi
+# Leak guard: the config carries OSS_MODEL_API_KEY. If it ever lands in the repo
+# working tree (cwd), the later `git add -A` would stage it into the PR diff.
+# Flag that so the regression test can fail.
 if [ -f opencode.json ]; then
-  cat opencode.json >> "$OPENCODE_JSON_LOG"
+  : > "$STUB_DIR/opencode-in-repo.flag"
 fi
 # Emit a PR-like URL on the same stdout discipline claude uses (>&2 in the
 # entrypoint), so the happy-path PR flow still works on the OSS branch.
@@ -390,6 +397,21 @@ STUB_EOF
   # NO cf-aig-* anywhere on the OSS path.
   ! grep -q "cf-aig-authorization" "$OPENCODE_JSON_LOG"
   ! grep -q "cf-aig-metadata" "$OPENCODE_JSON_LOG"
+}
+
+@test "OpenCode branch: config is generated OUTSIDE the repo (OSS key never staged by git add -A)" {
+  export AGENT_HARNESS="opencode"
+  export AGENT_MODEL="deepseek/deepseek-v3"
+  export OSS_MODEL_BASE_URL="https://litellm.internal/v1"
+  export OSS_MODEL_API_KEY="sk-litellm-123"
+  run "$ENTRYPOINT"
+  [ "$status" -eq 0 ]
+  # The config (which carries OSS_MODEL_API_KEY) is captured via OPENCODE_CONFIG,
+  # proving entrypoint pointed opencode at an out-of-repo path...
+  grep -q "sk-litellm-123" "$OPENCODE_JSON_LOG"
+  # ...and it must NOT sit in the cloned repo working tree, where `git add -A`
+  # would stage the secret into the published PR diff.
+  [ ! -f "$STUB_DIR/opencode-in-repo.flag" ]
 }
 
 @test "OpenCode branch: opencode.json is always VALID JSON even when a value contains a double-quote" {

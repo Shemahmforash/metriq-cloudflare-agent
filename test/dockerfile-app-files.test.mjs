@@ -65,3 +65,19 @@ test("Dockerfile pins the OpenCode harness to opencode-ai@1.15.11", () => {
       "(the bats tests pass only because they PATH-stub opencode).",
   );
 });
+
+// Supply-chain integrity: `@anthropic-ai/claude-code` is the most-privileged
+// binary in the image (runs --dangerously-skip-permissions with secrets in env),
+// so it must be pinned to an exact version — never trust-on-first-use — and must
+// not float like a `@latest` install. Mirrors the opencode-ai pin above.
+test("Dockerfile pins @anthropic-ai/claude-code to an exact version (not floating)", () => {
+  assert.match(
+    dockerfile,
+    /npm install -g\b[^\n]*@anthropic-ai\/claude-code@\d+\.\d+\.\d+\b/,
+    "the Claude harness is the most-privileged binary in the image, but the " +
+      "Dockerfile installs `@anthropic-ai/claude-code` without an exact version " +
+      "pin (`@x.y.z`). An unpinned global install is trust-on-first-use — a " +
+      "compromised upstream publish would run skip-permissions with all secrets " +
+      "in env. Pin it and bump deliberately, like opencode-ai.",
+  );
+});
