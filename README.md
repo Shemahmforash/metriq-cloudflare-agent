@@ -240,6 +240,8 @@ GitHub Actions (`.github/workflows/ci.yml`) runs typecheck + vitest + container 
 
 The `deploy` and `provision-gateway` jobs are gated on those two secrets being present: without them (a fresh fork, or this repo before you wire it up) a `gate` job makes them **skip cleanly** instead of failing, so CI is green out of the box. Set both secrets to enable deploys.
 
+To set them: repo **Settings → Secrets and variables → Actions → New repository secret**, add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Remove them to turn deploys back off.
+
 Container image is built and pushed to Cloudflare's registry automatically as part of `wrangler deploy` (the local Docker daemon does the build, then wrangler uploads).
 
 Manual deploy: `pnpm wrangler deploy` from a logged-in shell (`pnpm wrangler login` first).
