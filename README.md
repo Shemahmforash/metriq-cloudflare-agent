@@ -19,6 +19,51 @@ See [Secrets — production](#secrets--production-set-via-wrangler-secret-put-in
 
 This project is licensed under the [MIT License](LICENSE).
 
+## Getting started
+
+Pick your path:
+
+- **Just want to see it run — no Cloudflare account?** → [Local development](#local-development): `pnpm install && pnpm dev`.
+- **Deploy your own agent?** → [Quickstart](#quickstart-deploy-your-own-instance) below (needs a Cloudflare account **and a running Metriq instance**).
+- **Understand how it works?** → [Architecture](#architecture).
+- **Want to contribute?** → [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Quickstart: deploy your own instance
+
+> ⚠️ **Hard prerequisite — a running Metriq instance.** Metriq is the agent's
+> *work source*: without a reachable `METRIQ_MCP_URL` + API key, the agent boots
+> but has nothing to poll. You'll also need a Cloudflare account (Workers +
+> Containers), a GitHub PAT, and an Anthropic API key — see
+> [What you need to run this yourself](#what-you-need-to-run-this-yourself).
+
+1. **Clone & install** (fork instead if you want CI-based auto-deploy):
+   ```bash
+   git clone https://github.com/Shemahmforash/metriq-cloudflare-agent.git
+   cd metriq-cloudflare-agent
+   pnpm install
+   ```
+2. **Log in to Cloudflare:** `pnpm wrangler login`
+3. **Set the required secrets** (interactive prompts — never pass values as CLI
+   args). Full list + the ⚠️ trust-model note in
+   [Secrets — production](#secrets--production-set-via-wrangler-secret-put-in-a-real-terminal-not-via--prefixed-shells):
+   ```bash
+   wrangler secret put METRIQ_API_KEY      # from your Metriq instance
+   wrangler secret put METRIQ_MCP_URL      # https://<your-metriq-host>/api/v1/mcp
+   wrangler secret put GITHUB_PAT          # fine-grained, scoped to TARGET_REPO
+   wrangler secret put GITHUB_USER
+   wrangler secret put CONTROL_TOKEN       # a random bearer token you choose
+   wrangler secret put TARGET_REPO         # owner/name the agent opens PRs against
+   wrangler secret put ANTHROPIC_API_KEY   # or use the AI Gateway path
+   ```
+4. **Deploy:** `pnpm wrangler deploy` (or wire CI secrets for auto-deploy on
+   push — see [Deployment](#deployment)).
+5. **Wake the loop** — replace the placeholders with your deployed Worker's URL;
+   `CONTROL_TOKEN` is the secret you set in step 3:
+   ```bash
+   curl -X POST https://<your-worker>.<your-subdomain>.workers.dev/wake \
+     -H "authorization: Bearer $CONTROL_TOKEN"
+   ```
+
 ## Status
 
 Working end-to-end and deployable. What the agent does today:
