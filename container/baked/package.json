@@ -4,6 +4,6 @@
   "private": true,
   "description": "Generic placeholder manifest used only to pre-warm the agent container's pnpm store / node_modules layer at image-build time. It intentionally does NOT mirror any specific target repo: the baked node_modules are reused at dispatch time only when this lockfile byte-matches the cloned target's lockfile (see container/entrypoint.sh). On a mismatch the entrypoint falls back to a normal `pnpm install --frozen-lockfile`, which is still faster because the pnpm store is already populated.",
   "dependencies": {
-    "zod": "^3.23.8"
+    "zod": "^4.6.6"
   }
 }
